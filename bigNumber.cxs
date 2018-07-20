@@ -1,0 +1,467 @@
+
+Strict
+Import mojo
+Function Main:Int()
+	New MyApp	
+	Return 0
+End
+Class MyApp Extends App
+	Field big1:BigUInt
+	Field big2:BigUInt
+	Field cal1:BigUInt
+	Field cal1a:BigUInt
+	Field cal2:BigUInt
+	Field cal2a:BigUInt
+	Field cal3:BigUInt
+	Field cal3a:BigUInt
+	Method OnCreate:Int()
+		'TEST: You can check cal result at https://defuse.ca/big-number-calculator.htm
+		big1=New BigUInt("1123456789")
+		big2=New BigUInt("123456789")
+		cal1=New BigUInt()
+		cal1a=New BigUInt()
+		cal1.SetAs(big1)
+		cal1.MultiplyBy(big2)
+		cal1a.SetAs("46527346527345725")
+		cal1a.MultiplyBy("20912099395891")
+		cal2=New BigUInt()
+		cal2a=New BigUInt()
+		cal2.SetAs(big1)
+		cal2.AddWith(big2)
+		cal2a.SetAs("46527346527345725")
+		cal2a.AddWith("20912099395891")
+		cal3=New BigUInt()
+		cal3a=New BigUInt()
+		cal3.SetAs(big1)
+		cal3.SubWith(big2)
+		cal3a.SetAs("46527346527345725")
+		cal3a.SubWith("20912099395891")
+		If big1.MoreThanOrEqual(big2) Then
+			Print "MORE"
+		endif
+		If big1.MoreThanOrEqual("20912099395891") Then
+			Print "MORE"
+		endif
+		Return 0
+	End 
+	Method OnUpdate:Int()
+		Local normalNumber:Int=Int(Rnd(100000,1000000))
+		cal1.MultiplyBy(2)
+		cal2.AddWith(Int(Rnd(500000000,1000000000)))
+		cal3.SubWith(normalNumber)
+		Return 0
+ 	End 
+	Method OnRender:Int()
+		Cls()
+		DrawText("TEST BIGUINT",100,50)
+		DrawText("MULTIPLY",100,80)
+		DrawText(cal1.ToString(),100,100)
+		DrawText(cal1a.ToString(),100,120)
+		DrawText("ADD",100,140)
+		DrawText(cal2.ToString(),100,160)
+		DrawText(cal2a.ToString(),100,180)
+		DrawText("SUB",100,200)
+		DrawText(cal3.ToString(),100,220)
+		DrawText(cal3a.ToString(),100,240)
+		Return 0
+	End 
+End
+Class Generic<T>
+	Function AllocateArray:T[](i:Int)
+		Local arr:T[]=New T[i]
+		Return arr
+	End
+	Function AllocateArray:T[][](i:Int,j:Int)
+		Local arr:T[][]=New T[i][]
+		For Local index:Int = 0 Until i
+			arr[index]=AllocateArray(j)
+		Next
+		Return arr
+	End
+End
+Class BigUInt 
+	'====================================================
+	' Big Unsign Integer 
+	' - The number is stored in array of int32
+	' - Each array slot only hold value between 0 to 9999 
+	' - You can increase TOTALSLOT to the amount you want
+	'====================================================
+	Const TOTALSLOT:Int=10 'NUMBER OF ARRAY NEED. ONE SLOT HERE = 4 decimal digit. So 10 can hold 9999999999999999999999999999999999999999 digit number
+	Global SHORT:Bool=False 'Set True to output the integer string in short Metric prefix. https://en.wikipedia.org/wiki/Metric_prefix
+	Private 
+		Field digit:Int[][] = Generic<Int>.AllocateArray(TOTALSLOT,5)
+		Field overflow:Int '1=overflow 0=ok -1=negative
+	Public
+		Method New(StringVal:String="")
+			ActualMOV(StringVal)
+		End
+		Method MoreThan:Bool(big2:BigUInt)
+			For Local k:Int=0 To TOTALSLOT-1
+				digit[k][1]=big2.digit[k][0]
+			Next
+			Return ActualMoreThan()			
+		End
+		Method MoreThan:Bool(StringVal:String)
+			ActualMOV(StringVal,1)
+			Return ActualMoreThan()
+		End
+		Method LessThan:Bool(big2:BigUInt)
+			For Local k:Int=0 To TOTALSLOT-1
+				digit[k][1]=big2.digit[k][0]
+			Next
+			Return ActualLessThan()			
+		End
+		Method LessThan:Bool(StringVal:String)
+			ActualMOV(StringVal,1)
+			Return ActualLessThan()
+		End		
+		Method LessThanOrEqual:Bool(big2:BigUInt)
+			For Local k:Int=0 To TOTALSLOT-1
+				digit[k][1]=big2.digit[k][0]
+			Next
+			Return ActualLessThanOrEqual()			
+		End
+		Method LessThanOrEqual:Bool(StringVal:String)
+			ActualMOV(StringVal,1)
+			Return ActualLessThanOrEqual()
+		End
+		Method MoreThanOrEqual:Bool(big2:BigUInt)
+			For Local k:Int=0 To TOTALSLOT-1
+				digit[k][1]=big2.digit[k][0]
+			Next
+			Return ActualMoreThanOrEqual()			
+		End
+		Method MoreThanOrEqual:Bool(StringVal:String)
+			ActualMOV(StringVal,1)
+			Return ActualMoreThanOrEqual()
+		End
+		Method Equal:Bool(big2:BigUInt)
+			For Local k:Int=0 To TOTALSLOT-1
+				digit[k][1]=big2.digit[k][0]
+			Next
+			Return ActualEqual()			
+		End
+		Method Equal:Bool(StringVal:String)
+			ActualMOV(StringVal,1)
+			Return ActualEqual()
+		End
+		Method NotEqual:Bool(big2:BigUInt)
+			For Local k:Int=0 To TOTALSLOT-1
+				digit[k][1]=big2.digit[k][0]
+			Next
+			Return ActualNotEqual()			
+		End
+		Method NotEqual:Bool(StringVal:String)
+			ActualMOV(StringVal,1)
+			Return ActualNotEqual()
+		End
+		Method SetAs:Void(StringVal:String)
+			ActualMOV(StringVal)
+			overflow=0
+		End
+		Method SetAs:Void(big2:BigUInt)
+			For Local k:Int=0 To TOTALSLOT-1
+				digit[k][0]=big2.digit[k][0]
+			next
+			overflow=big2.overflow
+		End
+		Method ToString:String()
+			If overflow=1 Then Return "#OVERFLOW"
+			If overflow=-1 Then Return "#NEGATIVE"
+			'mix the digit as string
+				Local result:String=""
+				For Local k:Int=0 To TOTALSLOT-1
+					If digit[k][0]>0
+						Local str:String="    "+String(digit[k][0])
+						str=str[str.Length()-4..str.Length()]
+						result=str+result
+					Else
+						result="    "+result 'let 0000 as space for fast trim
+					endif
+				next
+			'trim and treat 0 at front
+			result=result+"#" 						'block trim on the right
+			result=result.Trim()
+			result=result[0..result.Length()-1] 	'omit the block # above
+			result=result.Replace(" ","0") 			'replace space as 0
+			If result="" Then result="0"
+			If SHORT
+				Return Shortern(result)
+			Else
+				Return result
+			endif
+		End
+		Method MultiplyBy:Int(big2:BigUInt) 'Function return 1 if ok and 0 if overflow
+			If big2.overflow=1 Then Return 0
+			If overflow=1 Then Return 0
+			For Local k:Int=0 To TOTALSLOT-1
+				digit[k][2]=digit[k][0] 	'reg 2 = copy number 1
+				digit[k][1]=0				'reg 1 = for add term. init to 0
+				digit[k][0]=0				'reg 0 = answer (with add term on going using reg 1) init to 0
+				digit[k][3]=big2.digit[k][0]'reg 3 = copy of string
+			next
+			Return ActualMUL()
+		End
+		Method MultiplyBy:Int(StringVal:String) 'Function return 1 if ok and 0 if overflow
+			If StringVal[0..1]="#" Then overflow=1;Return 0
+			If overflow=1 Then Return 0
+			For Local k:Int=0 To TOTALSLOT-1
+				digit[k][2]=digit[k][0] 	'reg 2 = copy number 1
+				digit[k][1]=0				'reg 1 = for add term. init to 0
+				digit[k][0]=0				'reg 0 = answer (with add term on going using reg 1) init to 0
+			next
+			ActualMOV(StringVal,3) 			'reg 3 = copy of string
+			Return ActualMUL()
+		End
+		Method AddWith:Int(StringVal:String) 'Function return 1 if ok and 0 if overflow
+			If StringVal[0..1]="#" Then overflow=1;Return 0
+			If overflow=1 Then Return 0
+			ActualMOV(StringVal,1)
+			Return ActualADD()
+		End
+		Method AddWith:Int(big2:BigUInt) 'Function return 1 if ok and 0 if overflow
+			If big2.overflow=1 Then Return 0
+			If overflow=1 Then Return 0
+			For Local k:Int=0 To TOTALSLOT-1
+				digit[k][1]=big2.digit[k][0]
+			next
+			Return ActualADD()
+		End
+		Method SubWith:Int(StringVal:String) 'Function return 1 if ok and 0 if negative result
+			If StringVal[0..1]="#" Then overflow=1;Return 0
+			If overflow=1 Then Return 0
+			ActualMOV(StringVal,1)
+			Return ActualSUB()
+		End
+		Method SubWith:Int(big2:BigUInt) 'Function return 1 if ok and 0 if overflow
+			If big2.overflow=1 Then Return 0
+			If overflow=1 Then Return 0
+			For Local k:Int=0 To TOTALSLOT-1
+				digit[k][1]=big2.digit[k][0]
+			next
+			Return ActualSUB()
+		End
+	Private
+		Method EmptyCarry:Void()
+			For Local k:Int=0 To TOTALSLOT-1
+				digit[k][4]=0
+			next
+		End
+		Method ADDTERM:Int() 
+			For Local k:Int=0 To TOTALSLOT-1
+				digit[k][0]=digit[k][0]+digit[k][1]
+				'get carry by devide
+					Local carry:Int=digit[k][0]/10000
+				'get digit by mod
+					digit[k][0]=digit[k][0] Mod 10000
+				'add the carry to upper digit
+				If carry>0
+					If k<TOTALSLOT-1
+						digit[k+1][0]=digit[k+1][0]+carry
+					Else
+						overflow=1
+						Return 0
+					endif
+				endif
+			next
+			Return 1
+		End
+		Method Borrow:Bool(k:Int)
+			If k<TOTALSLOT-1
+				If digit[k+1][0]>0
+					digit[k+1][0]=digit[k+1][0]-1
+					digit[k][0]=digit[k][0]+10000
+					Return True
+				Else
+					Borrow(k+1)
+					digit[k+1][0]=digit[k+1][0]-1
+					digit[k][0]=digit[k][0]+10000
+					Return True
+				endif
+			Else
+				Return false
+			endif
+		End
+		Method ActualMUL:Int()
+			For Local l:Int=0 To TOTALSLOT-1
+				EmptyCarry()
+				For Local k:Int=0 To TOTALSLOT-1
+					digit[k][1]=(digit[k][2]*digit[l][3])+digit[k][4]
+					'get carry by devide
+						Local carry:Int=digit[k][1]/10000
+						If carry>0
+							If k<TOTALSLOT-1
+								digit[k+1][4]=carry
+							Else
+								overflow=1
+								Return 0
+							endif
+						endif
+					'get digit by mod
+						digit[k][1]=digit[k][1] Mod 10000
+				next
+				'shift term l space
+				For Local n:int=0 To l-1
+					If digit[TOTALSLOT-1][1]<>0 Then overflow=1;Return 0
+					For Local m:Int=TOTALSLOT-1 To 1 Step -1
+						digit[m][1]=digit[m-1][1]
+					next
+					digit[0][1]=0
+				next
+				'add the result to register 0
+				ADDTERM()			
+			next
+			Return 1
+		End		
+		Method ActualADD:Int()
+			'add register 0 and register 1. the answer in register 0
+			For Local k:Int=0 To TOTALSLOT-1
+				digit[k][0]=digit[k][0]+digit[k][1]
+				'get carry by devide
+					Local carry:Int=digit[k][0]/10000
+				'get digit by mod
+					digit[k][0]=digit[k][0] Mod 10000
+				'add the carry to upper digit
+				If carry>0
+					If k<TOTALSLOT-1
+						digit[k+1][0]=digit[k+1][0]+carry
+					Else
+						overflow=1
+						Return 0
+					endif
+				endif
+			next
+			Return 1
+		End
+		Method ActualSUB:Int()
+			'Sub register 0 with 1. the answer in register 0
+			For Local k:Int=0 To TOTALSLOT-1
+				If digit[k][0]>=digit[k][1]
+					'can sub
+					digit[k][0]=digit[k][0]-digit[k][1]
+				Else
+					'need to borrow
+					If Borrow(k)
+						digit[k][0]=digit[k][0]-digit[k][1]
+					Else
+						overflow=-1
+						Return 0
+					endif
+				endif
+			next
+			Return 1
+		End		
+		Method ActualMOV:Void(StringVal:String,register:Int=0)
+			If SHORT 
+				StringVal=Nomilize(StringVal)
+			endif
+			StringVal=StringVal.Replace(" ","") '
+			If StringVal.Length()>TOTALSLOT*4 Then overflow=1;return
+			Local empty:String=""
+			For Local k:Int=0 To TOTALSLOT-1
+				digit[k][register]=0
+				empty=empty+"0000"
+			next
+			'fill front number with zero
+				StringVal=empty+StringVal 
+			'fill the digit
+				For Local k:Int=0 To TOTALSLOT-1
+					digit[k][register]=Int(StringVal[StringVal.Length()-((k+1)*4)..StringVal.Length()-(k*4)])
+				next
+		End
+		Method Shortern:String(result:String)
+			If result.Length()>24
+				'yotta	Y
+				result=result[0..result.Length()-24]+"Y"
+			Elseif result.Length()>21+6
+				'zetta	Z
+				result=result[0..result.Length()-21]+"Z"
+			Elseif result.Length()>18+6
+				'exa	E
+				result=result[0..result.Length()-18]+"E"
+			Elseif result.Length()>15+6
+				'peta	P
+				result=result[0..result.Length()-15]+"P"
+			Elseif result.Length()>12+6
+				'tera	T
+				result=result[0..result.Length()-12]+"T"
+			Elseif result.Length()>9+6
+				'giga	G
+				result=result[0..result.Length()-9]+"G"
+			Elseif result.Length()>6+6
+				'mega	M
+				result=result[0..result.Length()-6]+"M"
+			Elseif result.Length()>3+6
+				'kilo	k
+				result=result[0..result.Length()-3]+"K"
+			endif
+			Return result
+		End
+		Method Nomilize:String(input:String)
+			input=input.Replace("Y","000000000000000000000000")
+			input=input.Replace("Z","000000000000000000000")
+			input=input.Replace("E","000000000000000000")
+			input=input.Replace("P","000000000000000")
+			input=input.Replace("T","000000000000")
+			input=input.Replace("G","000000000")
+			input=input.Replace("M","000000")
+			input=input.Replace("K","000")
+			Return input
+		end
+		Method ActualNotEqual:Bool()
+			For Local k:Int=TOTALSLOT-1 To 0 Step -1
+				If digit[k][0]<>digit[k][1]
+					Return true
+				endif
+			next
+			Return false
+		End 
+		Method ActualEqual:Bool()
+			For Local k:Int=TOTALSLOT-1 To 0 Step -1
+				If digit[k][0]<>digit[k][1]
+					Return false
+				endif
+			next
+			Return true
+		End 
+		Method ActualMoreThanOrEqual:Bool()
+			For Local k:Int=TOTALSLOT-1 To 0 Step -1
+				If digit[k][0]>digit[k][1]
+					Return true
+				Elseif digit[k][0]<digit[k][1]
+					Return false
+				endif
+			next
+			Return true
+		End 
+		Method ActualLessThanOrEqual:Bool()
+			For Local k:Int=TOTALSLOT-1 To 0 Step -1
+				If digit[k][0]<digit[k][1]
+					Return true
+				Elseif digit[k][0]>digit[k][1]
+					Return false
+				endif
+			next
+			Return true
+		End 
+		Method ActualLessThan:Bool()
+			For Local k:Int=TOTALSLOT-1 To 0 Step -1
+				If digit[k][0]<digit[k][1]
+					Return true
+				Elseif digit[k][0]>digit[k][1]
+					Return false
+				endif
+			next
+			Return false
+		End 
+		Method ActualMoreThan:Bool()
+			For Local k:Int=TOTALSLOT-1 To 0 Step -1
+				If digit[k][0]>digit[k][1]
+					Return true
+				Elseif digit[k][0]<digit[k][1]
+					Return false
+				endif
+			next
+			Return false
+		End 
+End
